@@ -148,6 +148,7 @@ func (h *Handler) PutGeminiKeys(c *gin.Context) {
 func (h *Handler) PatchGeminiKey(c *gin.Context) {
 	type geminiKeyPatch struct {
 		APIKey         *string            `json:"api-key"`
+		Note           *string            `json:"note"`
 		Prefix         *string            `json:"prefix"`
 		BaseURL        *string            `json:"base-url"`
 		ProxyURL       *string            `json:"proxy-url"`
@@ -196,6 +197,9 @@ func (h *Handler) PatchGeminiKey(c *gin.Context) {
 			return
 		}
 		entry.APIKey = trimmed
+	}
+	if body.Value.Note != nil {
+		entry.Note = strings.TrimSpace(*body.Value.Note)
 	}
 	if body.Value.Prefix != nil {
 		entry.Prefix = strings.TrimSpace(*body.Value.Prefix)
@@ -308,6 +312,7 @@ func (h *Handler) PutClaudeKeys(c *gin.Context) {
 func (h *Handler) PatchClaudeKey(c *gin.Context) {
 	type claudeKeyPatch struct {
 		APIKey         *string               `json:"api-key"`
+		Note           *string               `json:"note"`
 		Prefix         *string               `json:"prefix"`
 		BaseURL        *string               `json:"base-url"`
 		ProxyURL       *string               `json:"proxy-url"`
@@ -348,6 +353,9 @@ func (h *Handler) PatchClaudeKey(c *gin.Context) {
 	entry := h.cfg.ClaudeKey[targetIndex]
 	if body.Value.APIKey != nil {
 		entry.APIKey = strings.TrimSpace(*body.Value.APIKey)
+	}
+	if body.Value.Note != nil {
+		entry.Note = strings.TrimSpace(*body.Value.Note)
 	}
 	if body.Value.Prefix != nil {
 		entry.Prefix = strings.TrimSpace(*body.Value.Prefix)
@@ -463,6 +471,7 @@ func (h *Handler) PutOpenAICompat(c *gin.Context) {
 func (h *Handler) PatchOpenAICompat(c *gin.Context) {
 	type openAICompatPatch struct {
 		Name          *string                             `json:"name"`
+		Note          *string                             `json:"note"`
 		Prefix        *string                             `json:"prefix"`
 		Disabled      *bool                               `json:"disabled"`
 		BaseURL       *string                             `json:"base-url"`
@@ -503,6 +512,9 @@ func (h *Handler) PatchOpenAICompat(c *gin.Context) {
 	entry := h.cfg.OpenAICompatibility[targetIndex]
 	if body.Value.Name != nil {
 		entry.Name = strings.TrimSpace(*body.Value.Name)
+	}
+	if body.Value.Note != nil {
+		entry.Note = strings.TrimSpace(*body.Value.Note)
 	}
 	if body.Value.Prefix != nil {
 		entry.Prefix = strings.TrimSpace(*body.Value.Prefix)
@@ -600,6 +612,7 @@ func (h *Handler) PutVertexCompatKeys(c *gin.Context) {
 func (h *Handler) PatchVertexCompatKey(c *gin.Context) {
 	type vertexCompatPatch struct {
 		APIKey         *string                     `json:"api-key"`
+		Note           *string                     `json:"note"`
 		Prefix         *string                     `json:"prefix"`
 		BaseURL        *string                     `json:"base-url"`
 		ProxyURL       *string                     `json:"proxy-url"`
@@ -649,6 +662,9 @@ func (h *Handler) PatchVertexCompatKey(c *gin.Context) {
 			return
 		}
 		entry.APIKey = trimmed
+	}
+	if body.Value.Note != nil {
+		entry.Note = strings.TrimSpace(*body.Value.Note)
 	}
 	if body.Value.Prefix != nil {
 		entry.Prefix = strings.TrimSpace(*body.Value.Prefix)
@@ -956,6 +972,7 @@ func (h *Handler) PutCodexKeys(c *gin.Context) {
 func (h *Handler) PatchCodexKey(c *gin.Context) {
 	type codexKeyPatch struct {
 		APIKey         *string              `json:"api-key"`
+		Note           *string              `json:"note"`
 		Prefix         *string              `json:"prefix"`
 		BaseURL        *string              `json:"base-url"`
 		ProxyURL       *string              `json:"proxy-url"`
@@ -996,6 +1013,9 @@ func (h *Handler) PatchCodexKey(c *gin.Context) {
 	entry := h.cfg.CodexKey[targetIndex]
 	if body.Value.APIKey != nil {
 		entry.APIKey = strings.TrimSpace(*body.Value.APIKey)
+	}
+	if body.Value.Note != nil {
+		entry.Note = strings.TrimSpace(*body.Value.Note)
 	}
 	if body.Value.Prefix != nil {
 		entry.Prefix = strings.TrimSpace(*body.Value.Prefix)
@@ -1086,6 +1106,7 @@ func normalizeOpenAICompatibilityEntry(entry *config.OpenAICompatibility) {
 		return
 	}
 	// Trim base-url; empty base-url indicates provider should be removed by sanitization
+	entry.Note = strings.TrimSpace(entry.Note)
 	entry.BaseURL = strings.TrimSpace(entry.BaseURL)
 	entry.Headers = config.NormalizeHeaders(entry.Headers)
 	existing := make(map[string]struct{}, len(entry.APIKeyEntries))
@@ -1119,6 +1140,7 @@ func normalizeClaudeKey(entry *config.ClaudeKey) {
 		return
 	}
 	entry.APIKey = strings.TrimSpace(entry.APIKey)
+	entry.Note = strings.TrimSpace(entry.Note)
 	entry.BaseURL = strings.TrimSpace(entry.BaseURL)
 	entry.ProxyURL = strings.TrimSpace(entry.ProxyURL)
 	entry.Headers = config.NormalizeHeaders(entry.Headers)
@@ -1144,6 +1166,7 @@ func normalizeCodexKey(entry *config.CodexKey) {
 		return
 	}
 	entry.APIKey = strings.TrimSpace(entry.APIKey)
+	entry.Note = strings.TrimSpace(entry.Note)
 	entry.Prefix = strings.TrimSpace(entry.Prefix)
 	entry.BaseURL = strings.TrimSpace(entry.BaseURL)
 	entry.ProxyURL = strings.TrimSpace(entry.ProxyURL)
@@ -1170,6 +1193,7 @@ func normalizeVertexCompatKey(entry *config.VertexCompatKey) {
 		return
 	}
 	entry.APIKey = strings.TrimSpace(entry.APIKey)
+	entry.Note = strings.TrimSpace(entry.Note)
 	entry.Prefix = strings.TrimSpace(entry.Prefix)
 	entry.BaseURL = strings.TrimSpace(entry.BaseURL)
 	entry.ProxyURL = strings.TrimSpace(entry.ProxyURL)

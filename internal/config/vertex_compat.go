@@ -17,6 +17,9 @@ type VertexCompatKey struct {
 	// Higher values are preferred; defaults to 0.
 	Priority int `yaml:"priority,omitempty" json:"priority,omitempty"`
 
+	// Note is a management-only remark for identifying this provider entry.
+	Note string `yaml:"note,omitempty" json:"note,omitempty"`
+
 	// Prefix optionally namespaces model aliases for this credential (e.g., "teamA/vertex-pro").
 	Prefix string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
 
@@ -66,6 +69,7 @@ func (cfg *Config) SanitizeVertexCompatKeys() {
 	for i := range cfg.VertexCompatAPIKey {
 		entry := cfg.VertexCompatAPIKey[i]
 		entry.APIKey = strings.TrimSpace(entry.APIKey)
+		entry.Note = strings.TrimSpace(entry.Note)
 		if entry.APIKey == "" {
 			continue
 		}

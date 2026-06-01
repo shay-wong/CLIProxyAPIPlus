@@ -399,6 +399,9 @@ type ClaudeKey struct {
 	// Higher values are preferred; defaults to 0.
 	Priority int `yaml:"priority,omitempty" json:"priority,omitempty"`
 
+	// Note is a management-only remark for identifying this provider entry.
+	Note string `yaml:"note,omitempty" json:"note,omitempty"`
+
 	// Prefix optionally namespaces models for this credential (e.g., "teamA/claude-sonnet-4").
 	Prefix string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
 
@@ -455,6 +458,9 @@ type CodexKey struct {
 	// Higher values are preferred; defaults to 0.
 	Priority int `yaml:"priority,omitempty" json:"priority,omitempty"`
 
+	// Note is a management-only remark for identifying this provider entry.
+	Note string `yaml:"note,omitempty" json:"note,omitempty"`
+
 	// Prefix optionally namespaces models for this credential (e.g., "teamA/gpt-5-codex").
 	Prefix string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
 
@@ -506,6 +512,9 @@ type GeminiKey struct {
 	// Higher values are preferred; defaults to 0.
 	Priority int `yaml:"priority,omitempty" json:"priority,omitempty"`
 
+	// Note is a management-only remark for identifying this provider entry.
+	Note string `yaml:"note,omitempty" json:"note,omitempty"`
+
 	// Prefix optionally namespaces models for this credential (e.g., "teamA/gemini-3-pro-preview").
 	Prefix string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
 
@@ -555,6 +564,9 @@ type OpenAICompatibility struct {
 
 	// Disabled prevents this provider from being used for routing.
 	Disabled bool `yaml:"disabled,omitempty" json:"disabled,omitempty"`
+
+	// Note is a management-only remark for identifying this provider entry.
+	Note string `yaml:"note,omitempty" json:"note,omitempty"`
 
 	// Prefix optionally namespaces model aliases for this provider (e.g., "teamA/kimi-k2").
 	Prefix string `yaml:"prefix,omitempty" json:"prefix,omitempty"`
@@ -898,6 +910,7 @@ func (cfg *Config) SanitizeOpenAICompatibility() {
 	for i := range cfg.OpenAICompatibility {
 		e := cfg.OpenAICompatibility[i]
 		e.Name = strings.TrimSpace(e.Name)
+		e.Note = strings.TrimSpace(e.Note)
 		e.Prefix = normalizeModelPrefix(e.Prefix)
 		e.BaseURL = strings.TrimSpace(e.BaseURL)
 		e.Headers = NormalizeHeaders(e.Headers)
@@ -919,6 +932,7 @@ func (cfg *Config) SanitizeCodexKeys() {
 	out := make([]CodexKey, 0, len(cfg.CodexKey))
 	for i := range cfg.CodexKey {
 		e := cfg.CodexKey[i]
+		e.Note = strings.TrimSpace(e.Note)
 		e.Prefix = normalizeModelPrefix(e.Prefix)
 		e.BaseURL = strings.TrimSpace(e.BaseURL)
 		e.Headers = NormalizeHeaders(e.Headers)
@@ -938,6 +952,7 @@ func (cfg *Config) SanitizeClaudeKeys() {
 	}
 	for i := range cfg.ClaudeKey {
 		entry := &cfg.ClaudeKey[i]
+		entry.Note = strings.TrimSpace(entry.Note)
 		entry.Prefix = normalizeModelPrefix(entry.Prefix)
 		entry.Headers = NormalizeHeaders(entry.Headers)
 		entry.ExcludedModels = NormalizeExcludedModels(entry.ExcludedModels)
@@ -956,6 +971,7 @@ func (cfg *Config) SanitizeGeminiKeys() {
 	for i := range cfg.GeminiKey {
 		entry := cfg.GeminiKey[i]
 		entry.APIKey = strings.TrimSpace(entry.APIKey)
+		entry.Note = strings.TrimSpace(entry.Note)
 		if entry.APIKey == "" {
 			continue
 		}
