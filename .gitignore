@@ -35,6 +35,7 @@ GEMINI.md
 .vscode/*
 .worktrees/
 .codex/*
+.omc/*
 .claude/*
 .gemini/*
 .serena/*
