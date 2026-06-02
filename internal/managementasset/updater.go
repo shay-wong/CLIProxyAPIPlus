@@ -26,7 +26,7 @@ import (
 
 const (
 	defaultManagementReleaseURL  = "https://api.github.com/repos/shay-wong/Cli-Proxy-API-Management-Center/releases/latest"
-	defaultManagementFallbackURL = "https://cpamc.router-for.me/"
+	defaultManagementFallbackURL = "https://github.com/shay-wong/Cli-Proxy-API-Management-Center/releases/latest/download/management.html"
 	managementAssetName          = "management.html"
 	httpUserAgent                = "CLIProxyAPI-management-updater"
 	managementSyncMinInterval    = 30 * time.Second
@@ -235,8 +235,8 @@ func EnsureLatestManagementHTML(ctx context.Context, staticDir string, proxyURL 
 		asset, remoteHash, err := fetchLatestAsset(ctx, client, releaseURL)
 		if err != nil {
 			if localFileMissing {
-				log.WithError(err).Warn("failed to fetch latest management release information, trying fallback page")
-				if ensureFallbackManagementHTML(ctx, client, localPath) {
+				log.WithError(err).Warn("failed to fetch latest management release information, trying fallback release asset")
+				if ensureFallbackManagementHTML(ctx, client, localPath, panelRepository) {
 					return nil, nil
 				}
 				return nil, nil
@@ -253,8 +253,8 @@ func EnsureLatestManagementHTML(ctx context.Context, staticDir string, proxyURL 
 		data, downloadedHash, err := downloadAsset(ctx, client, asset.BrowserDownloadURL)
 		if err != nil {
 			if localFileMissing {
-				log.WithError(err).Warn("failed to download management asset, trying fallback page")
-				if ensureFallbackManagementHTML(ctx, client, localPath) {
+				log.WithError(err).Warn("failed to download management asset, trying fallback release asset")
+				if ensureFallbackManagementHTML(ctx, client, localPath, panelRepository) {
 					return nil, nil
 				}
 				return nil, nil
@@ -281,23 +281,56 @@ func EnsureLatestManagementHTML(ctx context.Context, staticDir string, proxyURL 
 	return err == nil
 }
 
-func ensureFallbackManagementHTML(ctx context.Context, client *http.Client, localPath string) bool {
-	data, downloadedHash, err := downloadAsset(ctx, client, defaultManagementFallbackURL)
+func ensureFallbackManagementHTML(ctx context.Context, client *http.Client, localPath string, panelRepository string) bool {
+	fallbackURL := resolveFallbackDownloadURL(panelRepository)
+	data, downloadedHash, err := downloadAsset(ctx, client, fallbackURL)
 	if err != nil {
-		log.WithError(err).Warn("failed to download fallback management control panel page")
+		log.WithError(err).Warn("failed to download fallback management control panel release asset")
 		return false
 	}
 
-	log.Warnf("management asset downloaded from fallback URL without digest verification (hash=%s) — "+
-		"enable verified GitHub updates by keeping disable-auto-update-panel set to false", downloadedHash)
+	log.Warnf("management asset downloaded from fallback release asset without digest verification (url=%s hash=%s)", fallbackURL, downloadedHash)
 
 	if err = atomicWriteFile(localPath, data); err != nil {
 		log.WithError(err).Warn("failed to persist fallback management control panel page")
 		return false
 	}
 
-	log.Infof("management asset updated from fallback page successfully (hash=%s)", downloadedHash)
+	log.Infof("management asset updated from fallback release asset successfully (hash=%s)", downloadedHash)
 	return true
+}
+
+func resolveFallbackDownloadURL(repo string) string {
+	repo = strings.TrimSpace(repo)
+	if repo == "" {
+		return defaultManagementFallbackURL
+	}
+
+	parsed, err := url.Parse(repo)
+	if err != nil || parsed.Host == "" {
+		return defaultManagementFallbackURL
+	}
+
+	host := strings.ToLower(parsed.Host)
+	path := strings.Trim(parsed.Path, "/")
+
+	if host == "github.com" {
+		parts := strings.Split(path, "/")
+		if len(parts) >= 2 && parts[0] != "" && parts[1] != "" {
+			repoName := strings.TrimSuffix(parts[1], ".git")
+			return fmt.Sprintf("https://github.com/%s/%s/releases/latest/download/%s", parts[0], repoName, managementAssetName)
+		}
+	}
+
+	if host == "api.github.com" {
+		parts := strings.Split(path, "/")
+		if len(parts) >= 3 && parts[0] == "repos" && parts[1] != "" && parts[2] != "" {
+			repoName := strings.TrimSuffix(parts[2], ".git")
+			return fmt.Sprintf("https://github.com/%s/%s/releases/latest/download/%s", parts[1], repoName, managementAssetName)
+		}
+	}
+
+	return defaultManagementFallbackURL
 }
 
 func resolveReleaseURL(repo string) string {
