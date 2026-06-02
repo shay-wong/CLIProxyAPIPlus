@@ -59,12 +59,6 @@ jobs:
           suffix="${BASH_REMATCH[4]}"
           base="${major}.${minor_number}.${patch}"
 
-          if [[ -n "$suffix" ]]; then
-            is_fork=true
-          else
-            is_fork=false
-          fi
-
           {
             echo "ref=${release_ref}"
             echo "tag=${release_tag}"
@@ -72,7 +66,6 @@ jobs:
             echo "base=${base}"
             echo "minor=${major}.${minor_number}"
             echo "major=${major}"
-            echo "is_fork=${is_fork}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Checkout repository
@@ -103,12 +96,12 @@ jobs:
             ${{ steps.repo.outputs.image }}
             ${{ env.DOCKERHUB_REPO }}
           tags: |
-            type=raw,value=latest,enable=${{ steps.release.outputs.is_fork == 'false' }}
+            type=raw,value=latest
             type=raw,value=${{ steps.release.outputs.tag }}
             type=raw,value=${{ steps.release.outputs.version }}
-            type=raw,value=${{ steps.release.outputs.base }},enable=${{ steps.release.outputs.is_fork == 'false' }}
-            type=raw,value=${{ steps.release.outputs.minor }},enable=${{ steps.release.outputs.is_fork == 'false' }}
-            type=raw,value=${{ steps.release.outputs.major }},enable=${{ steps.release.outputs.is_fork == 'false' }}
+            type=raw,value=${{ steps.release.outputs.base }}
+            type=raw,value=${{ steps.release.outputs.minor }}
+            type=raw,value=${{ steps.release.outputs.major }}
             type=sha,prefix=sha-
 
       - name: Log in to GitHub Container Registry
