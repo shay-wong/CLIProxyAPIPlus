@@ -13,6 +13,9 @@ on:
       release_name:
         required: true
         type: string
+      dockerhub_name:
+        required: false
+        type: string
     secrets:
       DOCKERHUB_USERNAME:
         required: true
@@ -25,7 +28,6 @@ permissions:
 
 env:
   APP_NAME: CLIProxyAPI
-  DOCKERHUB_REPO: shaywong/cli-proxy-api
 
 jobs:
   docker:
@@ -88,13 +90,34 @@ jobs:
         id: repo
         run: echo "image=ghcr.io/${GITHUB_REPOSITORY@L}" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve Docker Hub repository
+        id: dockerhub
+        env:
+          INPUT_DOCKERHUB_NAME: ${{ inputs.dockerhub_name }}
+          VAR_DOCKERHUB_NAME: ${{ vars.DOCKERHUB_NAME }}
+        run: |
+          set -euo pipefail
+
+          dockerhub_name="${INPUT_DOCKERHUB_NAME:-$VAR_DOCKERHUB_NAME}"
+          if [[ -z "$dockerhub_name" ]]; then
+            echo "Docker Hub namespace is not configured. Set repository variable DOCKERHUB_NAME or pass dockerhub_name to this workflow." >&2
+            exit 1
+          fi
+
+          if [[ ! "$dockerhub_name" =~ ^[a-z0-9][a-z0-9_.-]*$ ]]; then
+            echo "Invalid Docker Hub namespace: ${dockerhub_name}" >&2
+            exit 1
+          fi
+
+          echo "image=${dockerhub_name}/cli-proxy-api" >> "$GITHUB_OUTPUT"
+
       - name: Generate Docker metadata
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: |
             ${{ steps.repo.outputs.image }}
-            ${{ env.DOCKERHUB_REPO }}
+            ${{ steps.dockerhub.outputs.image }}
           tags: |
             type=raw,value=latest
             type=raw,value=${{ steps.release.outputs.tag }}
