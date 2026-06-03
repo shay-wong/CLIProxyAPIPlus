@@ -2,6 +2,34 @@ package managementasset
 
 import "testing"
 
+func TestGitHubBearerTokenPrefersGitHubToken(t *testing.T) {
+	t.Setenv(githubTokenEnvName, " github-token ")
+	t.Setenv("GITSTORE_GIT_URL", "https://github.com/example/repo.git")
+	t.Setenv("GITSTORE_GIT_TOKEN", "gitstore-token")
+
+	if got := githubBearerToken(); got != "github-token" {
+		t.Fatalf("githubBearerToken() = %q, want github-token", got)
+	}
+}
+
+func TestResolveReleaseURLForcesHTTPS(t *testing.T) {
+	got := resolveReleaseURL("http://api.github.com/repos/example/panel")
+	want := "https://api.github.com/repos/example/panel/releases/latest"
+	if got != want {
+		t.Fatalf("resolveReleaseURL() = %q, want %q", got, want)
+	}
+}
+
+func TestManualRefreshUsesDistinctSingleflightKey(t *testing.T) {
+	localPath := "/tmp/management.html"
+	if got := managementAssetFlightKey(localPath, false); got != localPath {
+		t.Fatalf("automatic key = %q, want %q", got, localPath)
+	}
+	if got := managementAssetFlightKey(localPath, true); got == localPath {
+		t.Fatalf("forced key = %q, want distinct key", got)
+	}
+}
+
 func TestResolveFallbackDownloadURL(t *testing.T) {
 	tests := []struct {
 		name string

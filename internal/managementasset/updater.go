@@ -29,6 +29,7 @@ const (
 	defaultManagementFallbackURL = "https://github.com/shay-wong/Cli-Proxy-API-Management-Center/releases/latest/download/management.html"
 	managementAssetName          = "management.html"
 	httpUserAgent                = "CLIProxyAPI-management-updater"
+	githubTokenEnvName           = "GITHUB_TOKEN"
 	managementSyncMinInterval    = 30 * time.Second
 	updateCheckInterval          = 3 * time.Hour
 	maxAssetDownloadSize         = 50 << 20 // 10 MB safety limit for management asset downloads
@@ -180,6 +181,23 @@ func FilePath(configFilePath string) string {
 // EnsureLatestManagementHTML checks the latest management.html asset and updates the local copy when needed.
 // It coalesces concurrent sync attempts and returns whether the asset exists after the sync attempt.
 func EnsureLatestManagementHTML(ctx context.Context, staticDir string, proxyURL string, panelRepository string) bool {
+	exists, _ := ensureLatestManagementHTML(ctx, staticDir, proxyURL, panelRepository, false, false)
+	return exists
+}
+
+// RefreshLatestManagementHTML forces an immediate management.html asset sync and returns sync errors.
+func RefreshLatestManagementHTML(ctx context.Context, staticDir string, proxyURL string, panelRepository string) (bool, error) {
+	return ensureLatestManagementHTML(ctx, staticDir, proxyURL, panelRepository, true, true)
+}
+
+func managementAssetFlightKey(localPath string, force bool) string {
+	if force {
+		return localPath + ":force"
+	}
+	return localPath
+}
+
+func ensureLatestManagementHTML(ctx context.Context, staticDir string, proxyURL string, panelRepository string, force bool, reportErrors bool) (bool, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -187,15 +205,17 @@ func EnsureLatestManagementHTML(ctx context.Context, staticDir string, proxyURL 
 	staticDir = strings.TrimSpace(staticDir)
 	if staticDir == "" {
 		log.Debug("management asset sync skipped: empty static directory")
-		return false
+		return false, nil
 	}
 	localPath := filepath.Join(staticDir, managementAssetName)
 
-	_, _, _ = sfGroup.Do(localPath, func() (interface{}, error) {
+	flightKey := managementAssetFlightKey(localPath, force)
+
+	_, err, _ := sfGroup.Do(flightKey, func() (interface{}, error) {
 		lastUpdateCheckMu.Lock()
 		now := time.Now()
 		timeSinceLastAttempt := now.Sub(lastUpdateCheckTime)
-		if !lastUpdateCheckTime.IsZero() && timeSinceLastAttempt < managementSyncMinInterval {
+		if !force && !lastUpdateCheckTime.IsZero() && timeSinceLastAttempt < managementSyncMinInterval {
 			lastUpdateCheckMu.Unlock()
 			log.Debugf(
 				"management asset sync skipped by throttle: last attempt %v ago (interval %v)",
@@ -218,6 +238,9 @@ func EnsureLatestManagementHTML(ctx context.Context, staticDir string, proxyURL 
 
 		if errMkdirAll := os.MkdirAll(staticDir, 0o755); errMkdirAll != nil {
 			log.WithError(errMkdirAll).Warn("failed to prepare static directory for management asset")
+			if reportErrors {
+				return nil, errMkdirAll
+			}
 			return nil, nil
 		}
 
@@ -239,9 +262,15 @@ func EnsureLatestManagementHTML(ctx context.Context, staticDir string, proxyURL 
 				if ensureFallbackManagementHTML(ctx, client, localPath, panelRepository) {
 					return nil, nil
 				}
+				if reportErrors {
+					return nil, err
+				}
 				return nil, nil
 			}
 			log.WithError(err).Warn("failed to fetch latest management release information")
+			if reportErrors {
+				return nil, err
+			}
 			return nil, nil
 		}
 
@@ -257,19 +286,32 @@ func EnsureLatestManagementHTML(ctx context.Context, staticDir string, proxyURL 
 				if ensureFallbackManagementHTML(ctx, client, localPath, panelRepository) {
 					return nil, nil
 				}
+				if reportErrors {
+					return nil, err
+				}
 				return nil, nil
 			}
 			log.WithError(err).Warn("failed to download management asset")
+			if reportErrors {
+				return nil, err
+			}
 			return nil, nil
 		}
 
 		if remoteHash != "" && !strings.EqualFold(remoteHash, downloadedHash) {
-			log.Errorf("management asset digest mismatch: expected %s got %s — aborting update for safety", remoteHash, downloadedHash)
+			err = fmt.Errorf("management asset digest mismatch: expected %s got %s", remoteHash, downloadedHash)
+			log.Errorf("%v — aborting update for safety", err)
+			if reportErrors {
+				return nil, err
+			}
 			return nil, nil
 		}
 
 		if err = atomicWriteFile(localPath, data); err != nil {
 			log.WithError(err).Warn("failed to update management asset on disk")
+			if reportErrors {
+				return nil, err
+			}
 			return nil, nil
 		}
 
@@ -277,8 +319,11 @@ func EnsureLatestManagementHTML(ctx context.Context, staticDir string, proxyURL 
 		return nil, nil
 	})
 
-	_, err := os.Stat(localPath)
-	return err == nil
+	_, errStat := os.Stat(localPath)
+	if err != nil {
+		return errStat == nil, err
+	}
+	return errStat == nil, nil
 }
 
 func ensureFallbackManagementHTML(ctx context.Context, client *http.Client, localPath string, panelRepository string) bool {
@@ -300,6 +345,14 @@ func ensureFallbackManagementHTML(ctx context.Context, client *http.Client, loca
 	return true
 }
 
+func isSecureGitHubURL(u *url.URL) bool {
+	if u == nil {
+		return false
+	}
+	host := strings.ToLower(strings.TrimSpace(u.Host))
+	return u.Scheme == "https" && (host == "api.github.com" || host == "github.com")
+}
+
 func resolveFallbackDownloadURL(repo string) string {
 	repo = strings.TrimSpace(repo)
 	if repo == "" {
@@ -312,6 +365,7 @@ func resolveFallbackDownloadURL(repo string) string {
 	}
 
 	host := strings.ToLower(parsed.Host)
+	parsed.Scheme = "https"
 	path := strings.Trim(parsed.Path, "/")
 
 	if host == "github.com" {
@@ -345,6 +399,7 @@ func resolveReleaseURL(repo string) string {
 	}
 
 	host := strings.ToLower(parsed.Host)
+	parsed.Scheme = "https"
 	parsed.Path = strings.TrimSuffix(parsed.Path, "/")
 
 	if host == "api.github.com" {
@@ -365,6 +420,17 @@ func resolveReleaseURL(repo string) string {
 	return defaultManagementReleaseURL
 }
 
+func githubBearerToken() string {
+	if token := strings.TrimSpace(os.Getenv(githubTokenEnvName)); token != "" {
+		return token
+	}
+	gitURL := strings.ToLower(strings.TrimSpace(os.Getenv("GITSTORE_GIT_URL")))
+	if token := strings.TrimSpace(os.Getenv("GITSTORE_GIT_TOKEN")); token != "" && strings.Contains(gitURL, "github.com") {
+		return token
+	}
+	return ""
+}
+
 func fetchLatestAsset(ctx context.Context, client *http.Client, releaseURL string) (*releaseAsset, string, error) {
 	if strings.TrimSpace(releaseURL) == "" {
 		releaseURL = defaultManagementReleaseURL
@@ -376,8 +442,7 @@ func fetchLatestAsset(ctx context.Context, client *http.Client, releaseURL strin
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("User-Agent", httpUserAgent)
-	gitURL := strings.ToLower(strings.TrimSpace(os.Getenv("GITSTORE_GIT_URL")))
-	if tok := strings.TrimSpace(os.Getenv("GITSTORE_GIT_TOKEN")); tok != "" && strings.Contains(gitURL, "github.com") {
+	if tok := githubBearerToken(); tok != "" && isSecureGitHubURL(req.URL) {
 		req.Header.Set("Authorization", "Bearer "+tok)
 	}
 

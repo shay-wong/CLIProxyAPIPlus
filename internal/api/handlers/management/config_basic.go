@@ -21,6 +21,7 @@ import (
 const (
 	latestReleaseURL       = "https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest"
 	latestReleaseUserAgent = "CLIProxyAPI"
+	githubTokenEnvName     = "GITHUB_TOKEN"
 )
 
 func (h *Handler) GetConfig(c *gin.Context) {
@@ -34,6 +35,26 @@ func (h *Handler) GetConfig(c *gin.Context) {
 type releaseInfo struct {
 	TagName string `json:"tag_name"`
 	Name    string `json:"name"`
+}
+
+func applyGitHubHeaders(req *http.Request, userAgent string) {
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", userAgent)
+	if token := strings.TrimSpace(os.Getenv(githubTokenEnvName)); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+}
+
+func latestVersionStatusError(statusCode int, body []byte) (string, string) {
+	bodyText := strings.TrimSpace(string(body))
+	lowerBody := strings.ToLower(bodyText)
+	if statusCode == http.StatusForbidden && strings.Contains(lowerBody, "rate limit") {
+		return "github_rate_limited", "GitHub API rate limit exceeded; set GITHUB_TOKEN to increase the limit or try again later."
+	}
+	if bodyText == "" {
+		return "github_unexpected_status", fmt.Sprintf("GitHub API returned status %d", statusCode)
+	}
+	return "github_unexpected_status", fmt.Sprintf("GitHub API returned status %d: %s", statusCode, bodyText)
 }
 
 // GetLatestVersion returns the latest release version from GitHub without downloading assets.
@@ -53,8 +74,7 @@ func (h *Handler) GetLatestVersion(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "request_create_failed", "message": err.Error()})
 		return
 	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", latestReleaseUserAgent)
+	applyGitHubHeaders(req, latestReleaseUserAgent)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -69,7 +89,8 @@ func (h *Handler) GetLatestVersion(c *gin.Context) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		c.JSON(http.StatusBadGateway, gin.H{"error": "unexpected_status", "message": fmt.Sprintf("status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))})
+		errorCode, message := latestVersionStatusError(resp.StatusCode, body)
+		c.JSON(http.StatusBadGateway, gin.H{"error": errorCode, "message": message})
 		return
 	}
 
