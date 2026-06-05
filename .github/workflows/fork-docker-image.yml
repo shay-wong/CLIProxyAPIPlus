@@ -1,4 +1,4 @@
-name: Publish Docker image
+name: Publish fork Docker image
 
 on:
   workflow_call:
@@ -38,8 +38,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          release_tag="${INPUT_RELEASE_NAME:-$GITHUB_REF_NAME}"
-          release_ref="${INPUT_RELEASE_REF:-$GITHUB_REF}"
+          release_tag="${INPUT_RELEASE_NAME}"
+          release_ref="${INPUT_RELEASE_REF}"
           release_tag="${release_tag#refs/tags/}"
 
           if [[ ! "$release_ref" =~ ^refs/tags/ ]]; then

@@ -85,7 +85,7 @@ jobs:
 
   publish-docker:
     needs: create-fork-tag
-    uses: ./.github/workflows/docker-image.yml
+    uses: ./.github/workflows/fork-docker-image.yml
     with:
       release_name: ${{ needs.create-fork-tag.outputs.release_name }}
       release_ref: ${{ needs.create-fork-tag.outputs.release_ref }}
@@ -98,7 +98,7 @@ jobs:
 
   publish-binaries:
     needs: create-fork-tag
-    uses: ./.github/workflows/release.yaml
+    uses: ./.github/workflows/fork-release.yaml
     with:
       release_name: ${{ needs.create-fork-tag.outputs.release_name }}
       release_ref: ${{ needs.create-fork-tag.outputs.release_ref }}

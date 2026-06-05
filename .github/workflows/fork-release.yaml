@@ -1,4 +1,4 @@
-name: goreleaser
+name: fork goreleaser
 
 on:
   workflow_call:
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: ${{ inputs.release_ref || github.ref }}
+          ref: ${{ inputs.release_ref }}
       - name: Refresh models catalog
         run: |
           git fetch --depth 1 https://github.com/router-for-me/models.git main
@@ -33,7 +33,7 @@ jobs:
       - name: Generate Build Metadata
         run: |
           {
-            echo "VERSION=${{ inputs.release_name || github.ref_name }}"
+            echo "VERSION=${{ inputs.release_name }}"
             echo "COMMIT=$(git rev-parse --short HEAD)"
             echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >> "$GITHUB_ENV"
