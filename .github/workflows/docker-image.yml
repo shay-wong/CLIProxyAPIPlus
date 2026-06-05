@@ -1,6 +1,10 @@
 name: Publish Docker image
 
 on:
+  push:
+    tags:
+      - 'v*'
+      - '!v*-fork.*'
   workflow_call:
     inputs:
       release_ref:
